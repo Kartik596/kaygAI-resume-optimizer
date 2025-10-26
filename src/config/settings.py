@@ -54,6 +54,12 @@ class Settings:
     MODEL_RESUME_MATCHER = get_secret("MODEL_RESUME_MATCHER", "gpt-4o-mini")
     MODEL_OPTIMIZER = get_secret("MODEL_OPTIMIZER", "gpt-4o-mini")
     
+    # Temperature settings for ALL models
+    TEMP_JD_ANALYZER = float(get_secret("TEMP_JD_ANALYZER", "0.3"))
+    TEMP_RESUME_MATCHER = float(get_secret("TEMP_RESUME_MATCHER", "0.2"))
+    TEMP_MATCHER = float(get_secret("TEMP_MATCHER", "0.2"))  # Added this
+    TEMP_OPTIMIZER = float(get_secret("TEMP_OPTIMIZER", "0.5"))
+    
     # Validation
     if not OPENAI_API_KEY:
         raise ValueError(

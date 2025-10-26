@@ -1,5 +1,6 @@
 """
-Professional Resume Builder - DUAL-TONE with Dynamic Skills from JSON
+Professional Resume Builder - FULLY ADAPTIVE
+Handles ANY resume structure dynamically
 """
 import json
 from pathlib import Path
@@ -55,7 +56,6 @@ class ModernSectionHeader(Flowable):
 def draw_sidebar_background(canvas, doc):
     """Draw light teal background for sidebar area"""
     canvas.saveState()
-    
     canvas.setFillColor(colors.HexColor('#e6f4f4'))
     
     page_width = letter[0]
@@ -64,22 +64,63 @@ def draw_sidebar_background(canvas, doc):
     sidebar_x = page_width - 0.5*inch - sidebar_width
     
     canvas.rect(sidebar_x, 0.35*inch, sidebar_width, page_height - 0.85*inch, fill=1, stroke=0)
-    
     canvas.restoreState()
 
 
 class CompactStreamlinedBuilder:
-    """Build dual-tone resume with dynamic skills from JSON"""
+    """Fully adaptive resume builder - works with ANY JSON structure"""
     
     def __init__(self, json_path: str):
         self.json_path = Path(json_path)
         self.data = self._load_json()
+        self._normalize_data()  # Normalize structure
         self.styles = self._create_styles()
     
     def _load_json(self) -> Dict[str, Any]:
-        """Load resume data from provided JSON path"""
+        """Load resume data from JSON"""
         with open(self.json_path, 'r', encoding='utf-8') as f:
             return json.load(f)
+    
+    def _normalize_data(self):
+        """Normalize resume data to handle different structures"""
+        
+        # Handle personal_info vs contact
+        if 'contact' in self.data and 'personal_info' not in self.data:
+            self.data['personal_info'] = {'contact': self.data['contact']}
+        
+        if 'personal_info' not in self.data:
+            self.data['personal_info'] = {
+                'name': 'Unknown',
+                'contact': {
+                    'email': '',
+                    'phone': '',
+                    'location': '',
+                    'linkedin': ''
+                }
+            }
+        
+        # Ensure contact exists inside personal_info
+        if 'contact' not in self.data['personal_info']:
+            self.data['personal_info']['contact'] = {
+                'email': self.data['personal_info'].get('email', ''),
+                'phone': self.data['personal_info'].get('phone', ''),
+                'location': self.data['personal_info'].get('location', ''),
+                'linkedin': self.data['personal_info'].get('linkedin', '')
+            }
+        
+        # Ensure skills is a dict
+        if 'skills' not in self.data or not isinstance(self.data['skills'], dict):
+            self.data['skills'] = {}
+        
+        # Ensure experience is a list
+        if 'experience' not in self.data:
+            self.data['experience'] = []
+        
+        # Ensure education and certifications
+        if 'education' not in self.data:
+            self.data['education'] = []
+        if 'certifications' not in self.data:
+            self.data['certifications'] = []
     
     def _create_styles(self):
         """Create paragraph styles"""
@@ -155,14 +196,8 @@ class CompactStreamlinedBuilder:
         return styles
     
     def generate_pdf(self, output_path: str) -> str:
-        """Generate dual-tone professional resume"""
-        print(f"📄 Generating dual-tone resume from: {self.json_path}")
-        
-        # Debug info
-        skills_count = len(self.data.get('skills', {}).get('tools_and_technologies', []))
-        print(f"📊 Skills count: {skills_count}")
-        print(f"📝 Profile length: {len(self.data.get('profile', ''))} chars")
-        print(f"💼 Achievements: {len(self.data.get('experience', [{}])[0].get('achievements', []))}")
+        """Generate adaptive professional resume"""
+        print(f"📄 Generating resume from: {self.json_path}")
         
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         
@@ -178,7 +213,8 @@ class CompactStreamlinedBuilder:
         story = []
         
         # Header
-        header_box = CenteredNameHeader(self.data['personal_info']['name'], 7.5*inch, 0.5*inch)
+        name = self.data['personal_info'].get('name', 'Unknown')
+        header_box = CenteredNameHeader(name, 7.5*inch, 0.5*inch)
         
         header_table = Table([[header_box]], colWidths=[7.5*inch],
             style=TableStyle([
@@ -192,7 +228,7 @@ class CompactStreamlinedBuilder:
         story.append(header_table)
         story.append(Spacer(1, 0.08*inch))
         
-        # Build main content and sidebar
+        # Build main and sidebar
         left_main = self._build_main()
         right_sidebar = self._build_sidebar()
         
@@ -217,35 +253,38 @@ class CompactStreamlinedBuilder:
         elements = []
         
         # Professional Summary
-        elements.append(ModernSectionHeader('PROFESSIONAL SUMMARY', 4.9*inch))
-        elements.append(Spacer(1, 0.05*inch))
-        elements.append(Paragraph(self.data['profile'], self.styles['CompactMainText']))
-        elements.append(Spacer(1, 0.05*inch))
+        if self.data.get('profile'):
+            elements.append(ModernSectionHeader('PROFESSIONAL SUMMARY', 4.9*inch))
+            elements.append(Spacer(1, 0.05*inch))
+            elements.append(Paragraph(self.data['profile'], self.styles['CompactMainText']))
+            elements.append(Spacer(1, 0.05*inch))
         
         # Work History
-        elements.append(ModernSectionHeader('WORK HISTORY', 4.9*inch))
-        elements.append(Spacer(1, 0.05*inch))
-        
-        for i, exp in enumerate(self.data['experience']):
-            elements.append(Paragraph(
-                f"<b>{exp['title']}</b> - {exp['company']}", 
-                self.styles['CompactJobTitle']
-            ))
+        if self.data.get('experience'):
+            elements.append(ModernSectionHeader('WORK HISTORY', 4.9*inch))
+            elements.append(Spacer(1, 0.05*inch))
             
-            elements.append(Paragraph(
-                f"{exp.get('location', 'Remote')} | {exp['duration']}", 
-                self.styles['CompactCompanyDate']
-            ))
-            
-            for ach in exp['achievements']:
-                if isinstance(ach, dict):
-                    text = f"• <b>{ach['category']}:</b> {ach['description']}"
-                else:
-                    text = f"• {ach}"
-                elements.append(Paragraph(text, self.styles['CompactBulletPoint']))
-            
-            if i < len(self.data['experience']) - 1:
-                elements.append(Spacer(1, 0.03*inch))
+            for i, exp in enumerate(self.data['experience']):
+                elements.append(Paragraph(
+                    f"<b>{exp.get('title', 'Position')}</b> - {exp.get('company', 'Company')}", 
+                    self.styles['CompactJobTitle']
+                ))
+                
+                elements.append(Paragraph(
+                    f"{exp.get('location', 'Remote')} | {exp.get('duration', 'Dates')}", 
+                    self.styles['CompactCompanyDate']
+                ))
+                
+                achievements = exp.get('achievements', [])
+                for ach in achievements:
+                    if isinstance(ach, dict):
+                        text = f"• <b>{ach.get('category', 'Item')}:</b> {ach.get('description', '')}"
+                    else:
+                        text = f"• {ach}"
+                    elements.append(Paragraph(text, self.styles['CompactBulletPoint']))
+                
+                if i < len(self.data['experience']) - 1:
+                    elements.append(Spacer(1, 0.03*inch))
         
         return Table([[elem] for elem in elements], colWidths=[4.95*inch], style=TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'), 
@@ -256,9 +295,9 @@ class CompactStreamlinedBuilder:
         ]))
     
     def _build_sidebar(self):
-        """RIGHT - Sidebar with DYNAMIC skills from JSON"""
+        """RIGHT - Sidebar (FULLY ADAPTIVE)"""
         elements = []
-        contact = self.data['personal_info']['contact']
+        contact = self.data['personal_info'].get('contact', {})
         
         elements.append(Spacer(1, 0.05*inch))
         
@@ -266,13 +305,18 @@ class CompactStreamlinedBuilder:
         elements.append(ModernSectionHeader('CONTACT', 2.2*inch))
         elements.append(Spacer(1, 0.04*inch))
         
-        email = contact['email']
-        elements.append(Paragraph(
-            f'<b>Email:</b> <a href="mailto:{email}" color="#1a7f7a"><u>{email}</u></a>', 
-            self.styles['CompactSidebarText']
-        ))
-        elements.append(Paragraph(f"<b>Phone:</b> {contact['phone']}", self.styles['CompactSidebarText']))
-        elements.append(Paragraph(f"<b>Location:</b> {contact['location']}", self.styles['CompactSidebarText']))
+        if contact.get('email'):
+            email = contact['email']
+            elements.append(Paragraph(
+                f'<b>Email:</b> <a href="mailto:{email}" color="#1a7f7a"><u>{email}</u></a>', 
+                self.styles['CompactSidebarText']
+            ))
+        
+        if contact.get('phone'):
+            elements.append(Paragraph(f"<b>Phone:</b> {contact['phone']}", self.styles['CompactSidebarText']))
+        
+        if contact.get('location'):
+            elements.append(Paragraph(f"<b>Location:</b> {contact['location']}", self.styles['CompactSidebarText']))
         
         if contact.get('linkedin'):
             linkedin_url = contact['linkedin']
@@ -285,70 +329,68 @@ class CompactStreamlinedBuilder:
         
         elements.append(Spacer(1, 0.04*inch))
         
-        # ✅ SKILLS - READ FROM JSON (DYNAMIC)
-        elements.append(ModernSectionHeader('SKILLS', 2.2*inch))
-        elements.append(Spacer(1, 0.04*inch))
-        
+        # ✅ SKILLS - FULLY ADAPTIVE (reads ALL skill categories from JSON)
         skills_data = self.data.get('skills', {})
         
-        # Tools & Technologies
-        if 'tools_and_technologies' in skills_data and skills_data['tools_and_technologies']:
-            tools_list = ', '.join(skills_data['tools_and_technologies'])
-            elements.append(Paragraph(
-                f"<b>Tools & Technologies:</b> {tools_list}", 
-                self.styles['CompactSkills']
-            ))
-        
-        # Business Analysis
-        if 'business_analysis' in skills_data and skills_data['business_analysis']:
-            ba_list = ', '.join(skills_data['business_analysis'])
-            elements.append(Paragraph(
-                f"<b>Business Analysis:</b> {ba_list}", 
-                self.styles['CompactSkills']
-            ))
-        
-        # Document Writing
-        if 'document_writing' in skills_data and skills_data['document_writing']:
-            doc_list = ', '.join(skills_data['document_writing'])
-            elements.append(Paragraph(
-                f"<b>Document Writing:</b> {doc_list}", 
-                self.styles['CompactSkills']
-            ))
-        
-        # Agile Ceremonies
-        if 'agile_ceremonies' in skills_data and skills_data['agile_ceremonies']:
-            agile_list = ', '.join(skills_data['agile_ceremonies'])
-            elements.append(Paragraph(
-                f"<b>Agile Ceremonies:</b> {agile_list}", 
-                self.styles['CompactSkills']
-            ))
-        
-        # Soft Skills
-        if 'soft_skills' in skills_data and skills_data['soft_skills']:
-            soft_list = ', '.join(skills_data['soft_skills'])
-            elements.append(Paragraph(
-                f"<b>Soft Skills:</b> {soft_list}", 
-                self.styles['CompactSkills']
-            ))
-        
-        elements.append(Spacer(1, 0.04*inch))
+        if skills_data:
+            elements.append(ModernSectionHeader('SKILLS', 2.2*inch))
+            elements.append(Spacer(1, 0.04*inch))
+            
+            # Loop through ALL skill categories dynamically
+            for category_key, skills_list in skills_data.items():
+                if skills_list:  # Only show if not empty
+                    # Convert snake_case to Title Case
+                    category_display = category_key.replace('_', ' ').title()
+                    
+                    # Handle both list and string
+                    if isinstance(skills_list, list):
+                        skills_text = ', '.join(str(s) for s in skills_list)
+                    else:
+                        skills_text = str(skills_list)
+                    
+                    elements.append(Paragraph(
+                        f"<b>{category_display}:</b> {skills_text}", 
+                        self.styles['CompactSkills']
+                    ))
+            
+            elements.append(Spacer(1, 0.04*inch))
         
         # EDUCATION
-        elements.append(ModernSectionHeader('EDUCATION', 2.2*inch))
-        elements.append(Spacer(1, 0.04*inch))
-        for edu in self.data['education']:
-            elements.append(Paragraph(f"<b>{edu['institution']}</b>", self.styles['CompactSidebarText']))
-            elements.append(Paragraph(edu['degree'], self.styles['CompactSidebarText']))
-            elements.append(Paragraph(f"{edu['start_year']}-{edu['end_year']}", self.styles['CompactSidebarText']))
-            elements.append(Spacer(1, 0.02*inch))
+        if self.data.get('education'):
+            elements.append(ModernSectionHeader('EDUCATION', 2.2*inch))
+            elements.append(Spacer(1, 0.04*inch))
+            
+            for edu in self.data['education']:
+                institution = edu.get('institution', 'Institution')
+                degree = edu.get('degree', 'Degree')
+                
+                elements.append(Paragraph(f"<b>{institution}</b>", self.styles['CompactSidebarText']))
+                elements.append(Paragraph(degree, self.styles['CompactSidebarText']))
+                
+                # Handle different date formats
+                if 'year' in edu:
+                    elements.append(Paragraph(str(edu['year']), self.styles['CompactSidebarText']))
+                elif 'start_year' in edu and 'end_year' in edu:
+                    elements.append(Paragraph(f"{edu['start_year']}-{edu['end_year']}", self.styles['CompactSidebarText']))
+                
+                elements.append(Spacer(1, 0.02*inch))
         
         # CERTIFICATIONS
-        elements.append(ModernSectionHeader('CERTIFICATIONS', 2.2*inch))
-        elements.append(Spacer(1, 0.04*inch))
-        for cert in self.data['certifications']:
-            elements.append(Paragraph(f"<b>{cert['name']}</b>", self.styles['CompactSidebarText']))
-            elements.append(Paragraph(f"{cert['date']}", self.styles['CompactSidebarText']))
-            elements.append(Spacer(1, 0.02*inch))
+        if self.data.get('certifications'):
+            elements.append(ModernSectionHeader('CERTIFICATIONS', 2.2*inch))
+            elements.append(Spacer(1, 0.04*inch))
+            
+            for cert in self.data['certifications']:
+                name = cert.get('name', 'Certification')
+                elements.append(Paragraph(f"<b>{name}</b>", self.styles['CompactSidebarText']))
+                
+                # Handle different date formats
+                if 'date' in cert:
+                    elements.append(Paragraph(str(cert['date']), self.styles['CompactSidebarText']))
+                elif 'year' in cert:
+                    elements.append(Paragraph(str(cert['year']), self.styles['CompactSidebarText']))
+                
+                elements.append(Spacer(1, 0.02*inch))
         
         return Table([[elem] for elem in elements], colWidths=[2.3*inch], style=TableStyle([
             ('VALIGN', (0,0), (-1,-1), 'TOP'), 
@@ -359,5 +401,5 @@ class CompactStreamlinedBuilder:
         ]))
 
 
-# Export as ResumeBuilder for backward compatibility
+# Export
 ResumeBuilder = CompactStreamlinedBuilder
