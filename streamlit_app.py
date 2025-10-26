@@ -495,98 +495,122 @@ elif st.session_state.step == 4:
             st.session_state.step = 5
             st.rerun()
 
-# STEP 5 - Download & Analysis
+# STEP 5 - Download & Analysis (SAFE VERSION)
 elif st.session_state.step == 5:
-    st.title("🎉 Download & Analysis")
-    
-    st.subheader("📝 Name Your Resume")
-    company_name = st.text_input("Job name", placeholder="e.g., google-engineer")
-    if not company_name:
-        company_name = "custom-job"
-    company_name = company_name.lower().replace(' ', '-').replace('_', '-')
+    st.title("✅ Download & Analysis")
+    st.success("🎉 Your optimized resume is ready!")
     
     st.markdown("---")
     
-    if st.button("💾 Generate Final Resume", type="primary", use_container_width=True):
-        with st.spinner("Generating..."):
+    # Generate final PDF
+    if 'final_pdf_path' not in st.session_state:
+        with st.spinner("📄 Generating final PDF..."):
             try:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_dir = settings.OUTPUT_DIR
-                output_dir.mkdir(parents=True, exist_ok=True)
+                company_slug = st.session_state.jd_requirements.get('company_name', 'resume').replace(' ', '_').lower()
+                output_filename = f"resume_tailored_{company_slug}_{timestamp}.json"
+                output_path = settings.OUTPUT_DIR / output_filename
                 
-                final_json = output_dir / f"resume_final_{company_name}_{timestamp}.json"
-                final_pdf = output_dir / f"resume_final_{company_name}_{timestamp}.pdf"
-                
-                with open(final_json, 'w', encoding='utf-8') as f:
+                # Save tailored resume JSON
+                with open(output_path, 'w', encoding='utf-8') as f:
                     json.dump(st.session_state.preview_resume, f, indent=2, ensure_ascii=False)
                 
-                builder = ResumeBuilder(str(final_json))
-                builder.generate_pdf(str(final_pdf))
+                # Generate PDF
+                pdf_filename = f"resume_{company_slug}_{timestamp}.pdf"
+                pdf_path = settings.OUTPUT_DIR / pdf_filename
                 
-                st.success("✅ Resume Generated!")
-                st.balloons()
+                builder = ResumeBuilder(str(output_path))
+                builder.generate_pdf(str(pdf_path))
                 
-                # Download buttons
-                with open(final_pdf, 'rb') as f:
-                    st.download_button(
-                        "📥 Download PDF",
-                        f.read(),
-                        file_name=f"resume_{company_name}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-                
-                with open(final_json, 'r') as f:
-                    st.download_button(
-                        "📥 Download JSON",
-                        f.read(),
-                        file_name=f"resume_{company_name}.json",
-                        mime="application/json",
-                        use_container_width=True
-                    )
-                
-                # Before/After Analysis
-                st.markdown("---")
-                st.subheader("📊 Before vs After Analysis")
-                
-                with st.spinner("Analyzing improvement..."):
-                    sanitizer = PIISanitizer()
-                    matcher = ResumeMatcher()
-                    
-                    new_sanitized = sanitizer.sanitize_resume(st.session_state.preview_resume)
-                    new_match = matcher.calculate_match(new_sanitized, st.session_state.jd_requirements)
-                    
-                    old_match = st.session_state.match_analysis
-                    
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.metric(
-                            "Overall Match",
-                            f"{new_match['overall_match_score']}/100",
-                            f"+{new_match['overall_match_score'] - old_match['overall_match_score']}"
-                        )
-                    
-                    with col2:
-                        st.metric(
-                            "Skills Match",
-                            f"{new_match['skills_match']['score']}/100",
-                            f"+{new_match['skills_match']['score'] - old_match['skills_match']['score']}"
-                        )
-                    
-                    with col3:
-                        st.metric(
-                            "Keyword Coverage",
-                            f"{new_match['keyword_coverage']['score']}/100",
-                            f"+{new_match['keyword_coverage']['score'] - old_match['keyword_coverage']['score']}"
-                        )
-                    
-                    st.success(f"🎯 Your resume match improved by {new_match['overall_match_score'] - old_match['overall_match_score']} points!")
+                st.session_state.final_pdf_path = pdf_path
+                st.session_state.final_json_path = output_path
                 
             except Exception as e:
-                st.error(f"❌ Error: {e}")
+                st.error(f"❌ Failed to generate PDF: {str(e)}")
+                st.stop()
+    
+    # Download buttons
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📄 Resume PDF")
+        if st.session_state.final_pdf_path.exists():
+            with open(st.session_state.final_pdf_path, 'rb') as f:
+                pdf_bytes = f.read()
+            
+            st.download_button(
+                label="⬇️ Download PDF",
+                data=pdf_bytes,
+                file_name=st.session_state.final_pdf_path.name,
+                mime="application/pdf",
+                use_container_width=True,
+                type="primary"
+            )
+    
+    with col2:
+        st.subheader("📊 Resume JSON")
+        if st.session_state.final_json_path.exists():
+            with open(st.session_state.final_json_path, 'r', encoding='utf-8') as f:
+                json_data = f.read()
+            
+            st.download_button(
+                label="⬇️ Download JSON",
+                data=json_data,
+                file_name=st.session_state.final_json_path.name,
+                mime="application/json",
+                use_container_width=True
+            )
     
     st.markdown("---")
     
-    if st.button("🔄 Optimize Another Resume"):
-        reset_app()
+    # Analysis Report
+    st.subheader("📈 Optimization Analysis")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        match_score = st.session_state.match_analysis.get('overall_match', 0)
+        st.metric("Match Score", f"{match_score}%")
+    
+    with col2:
+        accepted = len(st.session_state.selected_ids)
+        st.metric("Changes Applied", accepted)
+    
+    with col3:
+        total = len(st.session_state.suggestions)
+        st.metric("Total Suggestions", total)
+    
+    # Save reports
+    if st.button("💾 Save Analysis Report", use_container_width=True):
+        with st.spinner("Saving..."):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            company_slug = st.session_state.jd_requirements.get('company_name', 'report').replace(' ', '_').lower()
+            
+            # Save optimization report
+            report = {
+                "match_score": st.session_state.match_analysis.get('overall_match', 0),
+                "changes_applied": len(st.session_state.selected_ids),
+                "total_suggestions": len(st.session_state.suggestions),
+                "jd_requirements": st.session_state.jd_requirements,
+                "timestamp": timestamp
+            }
+            
+            report_path = settings.OUTPUT_DIR / f"optimization_report_{company_slug}_{timestamp}.json"
+            with open(report_path, 'w', encoding='utf-8') as f:
+                json.dump(report, f, indent=2)
+            
+            st.success(f"✅ Report saved to `{settings.OUTPUT_DIR}`")
+    
+    st.markdown("---")
+    
+    # Navigation
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("⬅️ Back to Preview", use_container_width=True):
+            st.session_state.step = 4
+            st.rerun()
+    
+    with col2:
+        if st.button("🔄 Start New Optimization", use_container_width=True, type="primary"):
+            reset_app()

@@ -16,7 +16,7 @@ class PDFResumeParser:
     
     def __init__(self):
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = "gpt-4o"
+        self.model = "gpt-4.1-nano"
     
     def extract_text_and_links_from_pdf(self, pdf_file) -> tuple:
         """Extract text and hyperlinks"""

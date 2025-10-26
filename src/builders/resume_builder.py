@@ -73,7 +73,7 @@ class CompactStreamlinedBuilder:
     def __init__(self, json_path: str):
         self.json_path = Path(json_path)
         self.data = self._load_json()
-        self._normalize_data()  # Normalize structure
+        self._normalize_data()
         self.styles = self._create_styles()
     
     def _load_json(self) -> Dict[str, Any]:
@@ -275,12 +275,21 @@ class CompactStreamlinedBuilder:
                     self.styles['CompactCompanyDate']
                 ))
                 
+                # ✅ FINAL FIX: Use font tag for explicit bold
                 achievements = exp.get('achievements', [])
                 for ach in achievements:
                     if isinstance(ach, dict):
-                        text = f"• <b>{ach.get('category', 'Item')}:</b> {ach.get('description', '')}"
+                        category = ach.get('category', '').strip()
+                        description = ach.get('description', '').strip()
+                        
+                        # Use <font> tag for ReportLab bold
+                        if category and category != '':
+                            text = f"• <font name='Helvetica-Bold'>{category}:</font> {description}"
+                        else:
+                            text = f"• {description}"
                     else:
-                        text = f"• {ach}"
+                        text = f"• {str(ach)}"
+                    
                     elements.append(Paragraph(text, self.styles['CompactBulletPoint']))
                 
                 if i < len(self.data['experience']) - 1:
@@ -318,10 +327,17 @@ class CompactStreamlinedBuilder:
         if contact.get('location'):
             elements.append(Paragraph(f"<b>Location:</b> {contact['location']}", self.styles['CompactSidebarText']))
         
+        # ✅ FIXED: LinkedIn URL handling
         if contact.get('linkedin'):
-            linkedin_url = contact['linkedin']
-            if not linkedin_url.startswith('http'):
-                linkedin_url = f"https://www.linkedin.com/in/{linkedin_url}"
+            linkedin_value = contact['linkedin']
+            
+            if linkedin_value.startswith('http'):
+                linkedin_url = linkedin_value
+            elif linkedin_value.startswith('linkedin.com/in/'):
+                linkedin_url = f"https://www.{linkedin_value}"
+            else:
+                linkedin_url = f"https://www.linkedin.com/in/{linkedin_value}"
+            
             elements.append(Paragraph(
                 f'<b>LinkedIn:</b> <a href="{linkedin_url}" color="#1a7f7a"><u>Profile</u></a>', 
                 self.styles['CompactSidebarText']
@@ -329,20 +345,17 @@ class CompactStreamlinedBuilder:
         
         elements.append(Spacer(1, 0.04*inch))
         
-        # ✅ SKILLS - FULLY ADAPTIVE (reads ALL skill categories from JSON)
+        # SKILLS - FULLY ADAPTIVE
         skills_data = self.data.get('skills', {})
         
         if skills_data:
             elements.append(ModernSectionHeader('SKILLS', 2.2*inch))
             elements.append(Spacer(1, 0.04*inch))
             
-            # Loop through ALL skill categories dynamically
             for category_key, skills_list in skills_data.items():
-                if skills_list:  # Only show if not empty
-                    # Convert snake_case to Title Case
+                if skills_list:
                     category_display = category_key.replace('_', ' ').title()
                     
-                    # Handle both list and string
                     if isinstance(skills_list, list):
                         skills_text = ', '.join(str(s) for s in skills_list)
                     else:
@@ -367,7 +380,6 @@ class CompactStreamlinedBuilder:
                 elements.append(Paragraph(f"<b>{institution}</b>", self.styles['CompactSidebarText']))
                 elements.append(Paragraph(degree, self.styles['CompactSidebarText']))
                 
-                # Handle different date formats
                 if 'year' in edu:
                     elements.append(Paragraph(str(edu['year']), self.styles['CompactSidebarText']))
                 elif 'start_year' in edu and 'end_year' in edu:
@@ -384,7 +396,6 @@ class CompactStreamlinedBuilder:
                 name = cert.get('name', 'Certification')
                 elements.append(Paragraph(f"<b>{name}</b>", self.styles['CompactSidebarText']))
                 
-                # Handle different date formats
                 if 'date' in cert:
                     elements.append(Paragraph(str(cert['date']), self.styles['CompactSidebarText']))
                 elif 'year' in cert:
